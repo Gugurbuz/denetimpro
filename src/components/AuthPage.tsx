@@ -20,6 +20,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ type, onNavigate, onSubmit }
     setLoading(true);
 
     try {
+      // type === 'register' ise tam ad da gönderilir
       await onSubmit(email, password, type === 'register' ? fullName : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
@@ -31,13 +32,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ type, onNavigate, onSubmit }
   const handleQuickTest = async () => {
     setError('');
     setLoading(true);
+    
+    // Hızlı Test Kullanıcısı Bilgileri
+    const testEmail = 'test@denetimpro.com';
+    const testPassword = 'test123456';
 
     try {
-      // Test kullanıcı bilgileri
-      await onSubmit('test@denetimpro.com', 'test123456', 'Test Kullanıcı');
+      // Prop olarak gelen onSubmit (App.tsx'teki handleAuthSubmit) fonksiyonunu çağır
+      // Bu fonksiyon useAuth'tan signIn'ı tetikleyecektir.
+      await onSubmit(testEmail, testPassword);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Test girişi başarısız oldu');
+      // Eğer Supabase'te test kullanıcısı yoksa, önce kayıt etmeyi deneyebiliriz.
+      // Basitlik için sadece giriş deniyoruz, App.tsx'teki mantık halledecek.
+      setError('Hızlı giriş denemesi başarısız oldu.');
     } finally {
+      // Yönlendirme App.tsx'teki useEffect ile gerçekleşeceği için, burada loading'i bitiriyoruz.
+      // Hata yoksa useEffect tetiklenecek.
       setLoading(false);
     }
   };
