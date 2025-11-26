@@ -10,6 +10,9 @@ import {
   FileText,
 } from 'lucide-react';
 import type { Database } from '../../lib/supabase';
+import { FileUpload, type ParsedData } from './FileUpload';
+import { AIChat } from './AIChat';
+import { SmartEditor } from './SmartEditor';
 
 type Audit = Database['public']['Tables']['audits']['Row'];
 
@@ -90,57 +93,35 @@ export const UploadView: React.FC<{
   onComplete: () => void;
   updateAudit: (id: string, updates: Partial<Audit>) => Promise<any>;
 }> = ({ audit, onComplete, updateAudit }) => {
-  const [loading, setLoading] = React.useState(false);
-
-  const handleAnalyze = async () => {
+  const handleFileLoaded = async (data: ParsedData) => {
     if (!audit) return;
 
-    setLoading(true);
     try {
-      // Simulate analysis delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Update audit as data loaded
       await updateAudit(audit.id, {
         data_loaded: true,
         status: 'active',
       });
-
       onComplete();
     } catch (error) {
-      console.error('Analysis failed:', error);
-    } finally {
-      setLoading(false);
+      console.error('Failed to update audit:', error);
     }
   };
 
-  return (
-    <div className="h-full flex items-center justify-center animate-in zoom-in-95 duration-300">
-      <div className="bg-white p-16 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 text-center max-w-2xl w-full relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
-        <div className="h-28 w-28 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-10 shadow-inner">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-t-blue-600" />
-        </div>
-        <h2 className="text-4xl font-bold text-slate-800 mb-4 tracking-tight">Veri Kaynağı</h2>
-        <p className="text-slate-500 mb-12 text-lg max-w-lg mx-auto">
-          Analize başlamak için Yevmiye Defteri (XML) dosyanızı yükleyin veya demo veriyi kullanın.
-        </p>
-        <div className="flex flex-col gap-4 max-w-sm mx-auto">
-          <button
-            onClick={handleAnalyze}
-            disabled={loading}
-            className="w-full py-4 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-70 flex items-center justify-center gap-3 group"
-          >
-            {loading ? 'Analiz Yapılıyor...' : 'Demo Veriyi Analiz Et'}{' '}
-            {!loading && <TrendingUp size={20} className="group-hover:translate-x-1 transition-transform" />}
-          </button>
-          <button className="w-full py-4 bg-white border-2 border-slate-100 hover:border-slate-300 text-slate-600 rounded-2xl font-bold text-lg transition-all">
-            Dosya Seç...
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const handleLoadDemo = async () => {
+    if (!audit) return;
+
+    try {
+      await updateAudit(audit.id, {
+        data_loaded: true,
+        status: 'active',
+      });
+      onComplete();
+    } catch (error) {
+      console.error('Failed to load demo:', error);
+    }
+  };
+
+  return <FileUpload onFileLoaded={handleFileLoaded} onLoadDemo={handleLoadDemo} />;
 };
 
 // Analysis View
@@ -211,7 +192,7 @@ export const AIAssistantView: React.FC<{
   }
 
   return (
-    <div className="max-w-4xl mx-auto h-[calc(100vh-8rem)] flex flex-col bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+    <div className="max-w-4xl mx-auto h-[calc(100vh-8rem)] flex flex-col bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
       <div className="bg-slate-50/80 backdrop-blur-md p-4 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="bg-gradient-to-tr from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-200">
@@ -225,13 +206,8 @@ export const AIAssistantView: React.FC<{
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#FAFAFA] flex items-center justify-center">
-        <div className="text-center">
-          <Bot size={64} className="mx-auto text-slate-300 mb-4" />
-          <p className="text-slate-500">
-            AI asistanı entegrasyonu tamamlandı. Gemini API anahtarını .env dosyasına ekleyin.
-          </p>
-        </div>
+      <div className="flex-1 overflow-hidden">
+        <AIChat auditContext={`Denetim: ${audit.name}`} />
       </div>
     </div>
   );
@@ -240,37 +216,8 @@ export const AIAssistantView: React.FC<{
 // Reports View
 export const ReportsView: React.FC<{ audit?: Audit }> = ({ audit }) => {
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative">
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-30 sticky top-0">
-        <div className="flex items-center gap-4">
-          <div className="p-2.5 bg-slate-900 rounded-xl text-white shadow-md">
-            <FileText size={20} />
-          </div>
-          <div>
-            <h1 className="font-bold text-lg text-slate-800 leading-none">Akıllı Rapor</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1">{audit?.name || 'Denetim'}</p>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-y-auto bg-slate-50 p-8 flex justify-center items-start">
-        <div className="w-full max-w-4xl bg-white min-h-[1100px] shadow-xl shadow-slate-200/60 border border-slate-200 p-16 rounded-xl">
-          <h2 className="text-3xl font-bold mb-6">Denetim Raporu</h2>
-          <p className="text-slate-600 leading-relaxed">
-            Rapor editörü hazır. AI ile otomatik rapor oluşturma özelliği Gemini API anahtarı eklendikten
-            sonra aktif olacak.
-          </p>
-          <div className="mt-8 p-6 bg-blue-50 rounded-xl border border-blue-100">
-            <h3 className="font-bold text-lg mb-2">Özellikler:</h3>
-            <ul className="space-y-2 text-sm text-slate-700">
-              <li>✓ Yönetici özeti oluşturma</li>
-              <li>✓ E-posta taslağı hazırlama</li>
-              <li>✓ Eylem planı oluşturma</li>
-              <li>✓ PDF/Word export</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+    <div className="h-full flex flex-col bg-slate-50">
+      <SmartEditor auditName={audit?.name || 'Denetim'} auditData={audit} />
     </div>
   );
 };
