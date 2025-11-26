@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Mail, Lock, ArrowRight, Zap } from 'lucide-react';
+import { ShieldCheck, User, Mail, Lock, ArrowRight } from 'lucide-react';
 
 interface AuthPageProps {
   type: 'login' | 'register';
@@ -20,34 +20,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ type, onNavigate, onSubmit }
     setLoading(true);
 
     try {
-      // type === 'register' ise tam ad da gönderilir
       await onSubmit(email, password, type === 'register' ? fullName : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickTest = async () => {
-    setError('');
-    setLoading(true);
-    
-    // Hızlı Test Kullanıcısı Bilgileri
-    const testEmail = 'test@denetimpro.com';
-    const testPassword = 'test123456';
-
-    try {
-      // Prop olarak gelen onSubmit (App.tsx'teki handleAuthSubmit) fonksiyonunu çağır
-      // Bu fonksiyon useAuth'tan signIn'ı tetikleyecektir.
-      await onSubmit(testEmail, testPassword);
-    } catch (err) {
-      // Eğer Supabase'te test kullanıcısı yoksa, önce kayıt etmeyi deneyebiliriz.
-      // Basitlik için sadece giriş deniyoruz, App.tsx'teki mantık halledecek.
-      setError('Hızlı giriş denemesi başarısız oldu.');
-    } finally {
-      // Yönlendirme App.tsx'teki useEffect ile gerçekleşeceği için, burada loading'i bitiriyoruz.
-      // Hata yoksa useEffect tetiklenecek.
       setLoading(false);
     }
   };
@@ -150,36 +126,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ type, onNavigate, onSubmit }
             )}
           </button>
         </form>
-
-        {/* Hızlı Test Butonu */}
-        <div className="mt-4">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-slate-400 font-bold">veya</span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleQuickTest}
-            disabled={loading}
-            className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-3 rounded-xl font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-            ) : (
-              <>
-                <Zap size={18} /> Hızlı Test Girişi
-              </>
-            )}
-          </button>
-
-          <p className="mt-2 text-xs text-center text-slate-400">
-            Demo hesabı ile anında giriş yapın
-          </p>
-        </div>
 
         <div className="mt-8 text-center text-sm text-slate-500">
           {type === 'login' ? (
