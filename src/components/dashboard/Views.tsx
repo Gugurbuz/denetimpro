@@ -8,11 +8,14 @@ import {
   Sparkles,
   Bot,
   FileText,
+  Shield,
+  DollarSign,
 } from 'lucide-react';
 import type { Database } from '../../lib/supabase';
 import { FileUpload, type ParsedData } from './FileUpload';
 import { AIChat } from './AIChat';
 import { SmartEditor } from './SmartEditor';
+import { useAuditAnalysis } from '../../hooks/useAuditAnalysis';
 
 type Audit = Database['public']['Tables']['audits']['Row'];
 
@@ -21,6 +24,8 @@ export const DashboardView: React.FC<{
   audit?: Audit;
   onNavigate: (tab: 'dashboard' | 'upload' | 'analysis' | 'ai-assistant' | 'reports') => void;
 }> = ({ audit, onNavigate }) => {
+  const { analysis } = useAuditAnalysis(audit?.data_loaded ? audit.id : null);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-end">
@@ -42,14 +47,29 @@ export const DashboardView: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatBox title="İncelenen Fiş" value="-" icon={FileBarChart} colorClass="text-blue-600 bg-blue-50" />
-        <StatBox title="İşlem Hacmi" value="-" icon={Activity} colorClass="text-indigo-600 bg-indigo-50" />
-        <StatBox title="Risk Skoru" value="-" icon={AlertTriangle} colorClass="text-orange-600 bg-orange-50" />
         <StatBox
-          title="Yapay Zeka"
-          value="Beklemede"
-          icon={Sparkles}
-          colorClass="text-purple-600 bg-purple-50"
+          title="İncelenen Fiş"
+          value={analysis ? analysis.totalEntries.toString() : '-'}
+          icon={FileBarChart}
+          colorClass="text-blue-600 bg-blue-50"
+        />
+        <StatBox
+          title="İşlem Hacmi"
+          value={analysis ? `${(analysis.totalDebit / 1000000).toFixed(1)}M TL` : '-'}
+          icon={Activity}
+          colorClass="text-green-600 bg-green-50"
+        />
+        <StatBox
+          title="Risk Bulgusu"
+          value={analysis ? analysis.riskFindings.length.toString() : '-'}
+          icon={AlertTriangle}
+          colorClass="text-orange-600 bg-orange-50"
+        />
+        <StatBox
+          title="Ceza Riski"
+          value={analysis ? `${(analysis.riskFindings.reduce((sum, f) => sum + (f.penaltyRisk || 0), 0) / 1000).toFixed(0)}K TL` : 'Beklemede'}
+          icon={Shield}
+          colorClass="text-red-600 bg-red-50"
         />
       </div>
 
@@ -93,6 +113,9 @@ export const UploadView: React.FC<{
   onComplete: () => void;
   updateAudit: (id: string, updates: Partial<Audit>) => Promise<any>;
 }> = ({ audit, onComplete, updateAudit }) => {
+  const { loadDemoData } = useAuditAnalysis(null);
+  const [loading, setLoading] = React.useState(false);
+
   const handleFileLoaded = async (data: ParsedData) => {
     if (!audit) return;
 
@@ -110,7 +133,9 @@ export const UploadView: React.FC<{
   const handleLoadDemo = async () => {
     if (!audit) return;
 
+    setLoading(true);
     try {
+      await loadDemoData(audit.id);
       await updateAudit(audit.id, {
         data_loaded: true,
         status: 'active',
@@ -118,8 +143,21 @@ export const UploadView: React.FC<{
       onComplete();
     } catch (error) {
       console.error('Failed to load demo:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Demo veriler yükleniyor ve analiz ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <FileUpload onFileLoaded={handleFileLoaded} onLoadDemo={handleLoadDemo} />;
 };
@@ -129,6 +167,8 @@ export const AnalysisView: React.FC<{
   audit?: Audit;
   onNavigate: (tab: 'dashboard' | 'upload' | 'analysis' | 'ai-assistant' | 'reports') => void;
 }> = ({ audit, onNavigate }) => {
+  const { analysis, loading } = useAuditAnalysis(audit?.data_loaded ? audit.id : null);
+
   if (!audit?.data_loaded) {
     return (
       <div className="flex flex-col items-center justify-center h-96 bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
@@ -141,27 +181,144 @@ export const AnalysisView: React.FC<{
     );
   }
 
+  if (loading || !analysis) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  const totalPenaltyRisk = analysis.riskFindings.reduce((sum, f) => sum + (f.penaltyRisk || 0), 0);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <h2 className="text-2xl font-bold text-slate-800">Risk & Ceza Merkezi</h2>
-      <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
-        <p className="text-slate-600">
-          Risk analizi sonuçları burada görüntülenecek. Gerçek veri yüklendiğinde otomatik olarak tespit
-          edilecek.
-        </p>
-        <div className="mt-6 p-6 bg-blue-50 rounded-xl border border-blue-100">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <AlertTriangle size={24} className="text-blue-600" />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-800 mb-2">Örnek Risk Bulgusu</h4>
-              <p className="text-sm text-slate-600">
-                Gerçek XML verisi yüklendiğinde, kasa ters bakiye, tevsik sınırı ihlalleri ve diğer riskler
-                otomatik olarak tespit edilecek.
-              </p>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-800">Risk & Ceza Merkezi</h2>
+        <div className="bg-red-50 px-6 py-3 rounded-xl border border-red-200">
+          <div className="text-xs font-bold text-red-500 uppercase tracking-wider">Toplam Ceza Riski</div>
+          <div className="text-2xl font-bold text-red-700">{totalPenaltyRisk.toLocaleString('tr-TR')} TL</div>
+        </div>
+      </div>
+
+      <div className="grid gap-6">
+        {analysis.riskFindings.map((finding) => (
+          <div
+            key={finding.id}
+            className={`bg-white p-6 rounded-2xl border-2 ${
+              finding.severity === 'high'
+                ? 'border-red-200 bg-red-50/30'
+                : finding.severity === 'medium'
+                ? 'border-orange-200 bg-orange-50/30'
+                : 'border-yellow-200 bg-yellow-50/30'
+            } shadow-sm hover:shadow-md transition-shadow`}
+          >
+            <div className="flex items-start gap-4">
+              <div
+                className={`p-3 rounded-lg ${
+                  finding.severity === 'high'
+                    ? 'bg-red-100'
+                    : finding.severity === 'medium'
+                    ? 'bg-orange-100'
+                    : 'bg-yellow-100'
+                }`}
+              >
+                <AlertTriangle
+                  size={24}
+                  className={`${
+                    finding.severity === 'high'
+                      ? 'text-red-600'
+                      : finding.severity === 'medium'
+                      ? 'text-orange-600'
+                      : 'text-yellow-600'
+                  }`}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 ${
+                        finding.severity === 'high'
+                          ? 'bg-red-100 text-red-700'
+                          : finding.severity === 'medium'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {finding.type}
+                    </span>
+                    <h3 className="font-bold text-lg text-slate-800">{finding.title}</h3>
+                  </div>
+                  {finding.penaltyRisk !== undefined && finding.penaltyRisk > 0 && (
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500 font-medium">Ceza Riski</div>
+                      <div className="text-xl font-bold text-red-600">
+                        {finding.penaltyRisk.toLocaleString('tr-TR')} TL
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-slate-700 leading-relaxed mb-3">{finding.description}</p>
+                <div className="flex gap-4 text-sm">
+                  {finding.amount && (
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <DollarSign size={16} />
+                      <span className="font-medium">{finding.amount.toLocaleString('tr-TR')} TL</span>
+                    </div>
+                  )}
+                  {finding.accountCode && (
+                    <div className="text-slate-600">
+                      <span className="font-bold">Hesap:</span> {finding.accountCode}
+                    </div>
+                  )}
+                  {finding.date && (
+                    <div className="text-slate-600">
+                      <span className="font-bold">Tarih:</span> {finding.date}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+        ))}
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-lg mb-4">Hesap Özeti</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 font-bold text-slate-700">Hesap Kodu</th>
+                <th className="text-left py-3 px-4 font-bold text-slate-700">Hesap Adı</th>
+                <th className="text-right py-3 px-4 font-bold text-slate-700">Borç</th>
+                <th className="text-right py-3 px-4 font-bold text-slate-700">Alacak</th>
+                <th className="text-right py-3 px-4 font-bold text-slate-700">Bakiye</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analysis.accountSummary.slice(0, 10).map((account) => (
+                <tr key={account.code} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono font-bold text-slate-800">{account.code}</td>
+                  <td className="py-3 px-4 text-slate-700">{account.name}</td>
+                  <td className="py-3 px-4 text-right font-medium text-slate-700">
+                    {account.debit.toLocaleString('tr-TR')}
+                  </td>
+                  <td className="py-3 px-4 text-right font-medium text-slate-700">
+                    {account.credit.toLocaleString('tr-TR')}
+                  </td>
+                  <td
+                    className={`py-3 px-4 text-right font-bold ${
+                      account.balance < 0 ? 'text-red-600' : 'text-green-600'
+                    }`}
+                  >
+                    {account.balance.toLocaleString('tr-TR')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
